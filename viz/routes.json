@@ -1,0 +1,153 @@
+{
+  "synthetic": true,
+  "notice": "p·r 은 가정값이며 넛지 효과 예측이 아닙니다. 단위는 도상 px (평면도 위 길이)이며 실제 거리(m)·시간(s)이 아닙니다.",
+  "branch_d_px": 30.02,
+  "junction": "J",
+  "wrong_branch_end": "R6",
+  "nodes": {
+    "B": [
+      60.0,
+      200.0
+    ],
+    "J": [
+      140.0,
+      200.0
+    ],
+    "R6": [
+      140.0,
+      170.0
+    ],
+    "X": [
+      260.0,
+      200.0
+    ],
+    "R5": [
+      400.0,
+      200.0
+    ],
+    "S": [
+      260.0,
+      320.0
+    ],
+    "P1": [
+      400.0,
+      320.0
+    ],
+    "P2": [
+      60.0,
+      320.0
+    ],
+    "Y": [
+      60.0,
+      260.0
+    ]
+  },
+  "edges": [
+    [
+      "B",
+      "J"
+    ],
+    [
+      "J",
+      "R6"
+    ],
+    [
+      "J",
+      "X"
+    ],
+    [
+      "X",
+      "R5"
+    ],
+    [
+      "X",
+      "S"
+    ],
+    [
+      "R5",
+      "P1"
+    ],
+    [
+      "B",
+      "Y"
+    ],
+    [
+      "Y",
+      "P2"
+    ]
+  ],
+  "routes": [
+    {
+      "id": "B-R6",
+      "origin": "B",
+      "destination": "R6",
+      "building": "6",
+      "mode": "BRT",
+      "color": "#1f6feb",
+      "length_px": 110.0,
+      "path": [
+        "B",
+        "J",
+        "R6"
+      ]
+    },
+    {
+      "id": "B-R5",
+      "origin": "B",
+      "destination": "R5",
+      "building": "5",
+      "mode": "BRT",
+      "color": "#1f6feb",
+      "length_px": 340.0,
+      "path": [
+        "B",
+        "J",
+        "X",
+        "R5"
+      ]
+    },
+    {
+      "id": "S-R5",
+      "origin": "S",
+      "destination": "R5",
+      "building": "5",
+      "mode": "BUS",
+      "color": "#2da44e",
+      "length_px": 260.0,
+      "path": [
+        "S",
+        "X",
+        "R5"
+      ]
+    },
+    {
+      "id": "P1-R5",
+      "origin": "P1",
+      "destination": "R5",
+      "building": "5",
+      "mode": "CAR",
+      "color": "#d97706",
+      "length_px": 120.0,
+      "path": [
+        "P1",
+        "R5"
+      ]
+    },
+    {
+      "id": "P2-R6",
+      "origin": "P2",
+      "destination": "R6",
+      "building": "6",
+      "mode": "CAR",
+      "color": "#d97706",
+      "length_px": 230.0,
+      "path": [
+        "P2",
+        "Y",
+        "B",
+        "J",
+        "R6"
+      ]
+    }
+  ]
+}

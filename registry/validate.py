@@ -64,10 +64,15 @@ def _check_marker_revision(reg: Registry) -> list[Issue]:
 
 
 def _check_label_consistency(reg: Registry) -> list[Issue]:
-    """같은 building_no + purpose 의 label_ko 는 동일해야 한다."""
+    """같은 목적지(접수처 building_no + purpose)의 label_ko 는 동일해야 한다.
+
+    출발점·갈림길 표식은 자기 위치 이름을 쓰므로 비교 대상이 아니다.
+    """
     issues: list[Issue] = []
     seen: dict[tuple[str, str], str] = {}  # (building_no, purpose) -> label_ko
     for m in reg.markers:
+        if m.node_kind != "reception":
+            continue
         key = (m.building_no, m.purpose)
         if key not in seen:
             seen[key] = m.label_ko
