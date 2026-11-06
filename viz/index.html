@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>세종청사 5·6동 경로 재생 (Wayfinding)</title>
+<style>
+  :root { --fg:#1b1f24; --muted:#57606a; --bg:#ffffff; --line:#d0d7de; --focus:#0969da; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+         color:var(--fg); background:var(--bg); line-height:1.5; }
+  header, main, footer { max-width: 980px; margin: 0 auto; padding: 12px 16px; }
+  h1 { font-size: 1.35rem; margin: 8px 0; }
+  .notice { border-left: 4px solid #bf8700; background:#fff8c5; padding:8px 12px; font-size:.95rem; }
+  .synthetic { display:inline-block; margin-top:6px; padding:2px 8px; border:1px solid var(--line);
+               border-radius:4px; font-size:.85rem; color:var(--muted); }
+  form { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:flex-end; margin:12px 0; }
+  label { display:flex; flex-direction:column; font-size:.9rem; gap:4px; }
+  select, input, button { font: inherit; font-size: 1rem; }
+  select, button { min-height: 44px; padding: 6px 12px; }
+  button { cursor:pointer; border:1px solid var(--fg); background:var(--fg); color:#fff; border-radius:6px; }
+  button.secondary { background:#fff; color:var(--fg); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+  fieldset { border:1px solid var(--line); border-radius:6px; padding:6px 12px; margin:0; }
+  fieldset label { flex-direction:row; align-items:center; gap:6px; min-height:32px; }
+  svg { width:100%; height:auto; border:1px solid var(--line); border-radius:6px; background:#fafbfc; }
+  .status { font-size:1.05rem; font-weight:600; min-height:1.6em; margin:8px 0; }
+  table { border-collapse: collapse; width:100%; font-size:.95rem; margin-top:8px; }
+  th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; }
+  th { background:#f6f8fa; }
+  .swatch { display:inline-block; width:14px; height:14px; border-radius:3px; vertical-align:middle;
+            margin-right:6px; border:1px solid #0003; }
+  footer { color:var(--muted); font-size:.85rem; }
+  .big { font-size:1.15rem; font-weight:700; }
+  body.large { font-size: 1.25rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>세종청사 5·6동 방문자 경로 재생</h1>
+  <p class="notice" id="notice"></p>
+  <span class="synthetic" id="synthetic"></span>
+</header>
+
+<main>
+  <form id="controls" onsubmit="return false">
+    <label>경로 (도착 수단 · 목적 동)
+      <select id="route"></select>
+    </label>
+    <fieldset>
+      <legend>재생 방식</legend>
+      <label><input type="radio" name="mode" value="normal" checked> 정상 경로</label>
+      <label><input type="radio" name="mode" value="misentry" id="mode-mis"> 오진입 후 복귀</label>
+    </fieldset>
+    <label>r (틀린 가지에서 알아챈 위치, 0–1): <output id="r-out">0.50</output>
+      <input type="range" id="r" min="0" max="1" step="0.05" value="0.5" aria-describedby="r-help">
+    </label>
+    <button type="button" id="play">재생</button>
+    <button type="button" id="large" class="secondary" aria-pressed="false">큰 글씨</button>
+  </form>
+  <p id="r-help" class="muted" style="font-size:.85rem;margin:0">
+    오진입 재생은 첫 갈림길 J 를 지나고 목적지가 갈림길 끝이 아닌 경로에서만 쓸 수 있습니다.
+  </p>
+
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+
+  <svg id="map" viewBox="0 0 460 380" role="img" aria-labelledby="map-title map-desc">
+    <title id="map-title">합성 좌표 경로도</title>
+    <desc id="map-desc">점과 구간, 선택한 경로의 이동 애니메이션. 경로 정보는 아래 표에도 문자로 나옵니다.</desc>
+    <g id="edges"></g>
+    <g id="trail"></g>
+    <g id="nodes"></g>
+    <circle id="walker" r="7" fill="#000" stroke="#fff" stroke-width="2" visibility="hidden"></circle>
+  </svg>
+
+  <table aria-label="경로 요약">
+    <thead><tr><th>경로</th><th>도착 수단</th><th>목적</th><th>지나는 점</th><th>도상길이 (px)</th></tr></thead>
+    <tbody id="summary"></tbody>
+  </table>
+</main>
+
+<footer>
+  <p>색상은 도착 수단, 숫자는 목적 동입니다. 색만 보지 않아도 되도록 수단 이름과 동번호를 함께 적습니다.</p>
+  <p>이 화면은 실제 청사 평면도를 포함하지 않습니다.</p>
+</footer>
+
+<script>
+const DATA = {"synthetic": true, "notice": "p·r 은 가정값이며 넛지 효과 예측이 아닙니다. 단위는 도상 px (평면도 위 길이)이며 실제 거리(m)·시간(s)이 아닙니다.", "branch_d_px": 30.02, "junction": "J", "wrong_branch_end": "R6", "nodes": {"B": [60.0, 200.0], "J": [140.0, 200.0], "R6": [140.0, 170.0], "X": [260.0, 200.0], "R5": [400.0, 200.0], "S": [260.0, 320.0], "P1": [400.0, 320.0], "P2": [60.0, 320.0], "Y": [60.0, 260.0]}, "edges": [["B", "J"], ["J", "R6"], ["J", "X"], ["X", "R5"], ["X", "S"], ["R5", "P1"], ["B", "Y"], ["Y", "P2"]], "routes": [{"id": "B-R6", "origin": "B", "destination": "R6", "building": "6", "mode": "BRT", "color": "#1f6feb", "length_px": 110.0, "path": ["B", "J", "R6"]}, {"id": "B-R5", "origin": "B", "destination": "R5", "building": "5", "mode": "BRT", "color": "#1f6feb", "length_px": 340.0, "path": ["B", "J", "X", "R5"]}, {"id": "S-R5", "origin": "S", "destination": "R5", "building": "5", "mode": "BUS", "color": "#2da44e", "length_px": 260.0, "path": ["S", "X", "R5"]}, {"id": "P1-R5", "origin": "P1", "destination": "R5", "building": "5", "mode": "CAR", "color": "#d97706", "length_px": 120.0, "path": ["P1", "R5"]}, {"id": "P2-R6", "origin": "P2", "destination": "R6", "building": "6", "mode": "CAR", "color": "#d97706", "length_px": 230.0, "path": ["P2", "Y", "B", "J", "R6"]}]};
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  $("notice").textContent = DATA.notice;
+  $("synthetic").textContent = DATA.synthetic ? "합성 좌표 (실제 청사 좌표 아님)" : "계획선 좌표";
+
+  const P = (id) => DATA.nodes[id];
+  const el = (tag, attrs, text) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text;
+    return e;
+  };
+
+  // 구간
+  for (const [a, b] of DATA.edges) {
+    const [x1, y1] = P(a), [x2, y2] = P(b);
+    $("edges").appendChild(el("line", { x1, y1, x2, y2, stroke: "#c4c9cf", "stroke-width": 6, "stroke-linecap": "round" }));
+  }
+  // 점 + 라벨
+  for (const id in DATA.nodes) {
+    const [x, y] = P(id);
+    const isRec = id.startsWith("R");
+    $("nodes").appendChild(el("circle", { cx: x, cy: y, r: isRec ? 9 : 6, fill: isRec ? "#1b1f24" : "#fff", stroke: "#1b1f24", "stroke-width": 2 }));
+    $("nodes").appendChild(el("text", { x: x + 11, y: y - 9, "font-size": isRec ? 15 : 13, "font-weight": isRec ? 700 : 400 }, id));
+  }
+
+  // 경로 목록
+  const sel = $("route");
+  for (const r of DATA.routes) {
+    const o = document.createElement("option");
+    o.value = r.id;
+    o.textContent = `${r.mode} · ${r.building}동 방문접수 (${r.origin} → ${r.destination})`;
+    sel.appendChild(o);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.origin} → ${r.destination}</td>
+      <td><span class="swatch" style="background:${r.color}"></span>${r.mode}</td>
+      <td class="big">${r.building}동 방문접수</td>
+      <td>${r.path.join(" → ")}</td><td>${r.length_px.toFixed(1)}</td>`;
+    $("summary").appendChild(tr);
+  }
+  sel.value = "B-R5";
+
+  const route = () => DATA.routes.find((r) => r.id === sel.value);
+  const canMisentry = (r) => r.path.includes(DATA.junction) && r.destination !== DATA.wrong_branch_end
+    && r.path[r.path.length - 1] !== DATA.junction;
+
+  // 재생할 좌표 목록 (오진입이면 J 에서 틀린 가지를 r 만큼 갔다 복귀)
+  function waypoints(r, misentry, rr) {
+    const pts = [];
+    for (const id of r.path) {
+      pts.push({ xy: P(id), label: id });
+      if (misentry && id === DATA.junction) {
+        const [jx, jy] = P(id), [wx, wy] = P(DATA.wrong_branch_end);
+        const turn = [jx + (wx - jx) * rr, jy + (wy - jy) * rr];
+        pts.push({ xy: turn, label: "오진입 발견", wrong: true });
+        pts.push({ xy: [jx, jy], label: `${id} 복귀`, wrong: true });
+      }
+    }
+    return pts;
+  }
+
+  function syncControls() {
+    const ok = canMisentry(route());
+    $("mode-mis").disabled = !ok;
+    if (!ok) document.querySelector('input[value="normal"]').checked = true;
+    $("r").disabled = !ok || mode() !== "misentry";
+  }
+  const mode = () => document.querySelector('input[name="mode"]:checked').value;
+
+  let raf = 0;
+  function play() {
+    cancelAnimationFrame(raf);
+    const r = route();
+    const mis = mode() === "misentry";
+    const rr = parseFloat($("r").value);
+    const pts = waypoints(r, mis, rr);
+    const segs = [];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const [x1, y1] = pts[i - 1].xy, [x2, y2] = pts[i].xy;
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      segs.push({ a: pts[i - 1], b: pts[i], len, start: total });
+      total += len;
+    }
+    const trail = $("trail");
+    trail.replaceChildren();
+    const w = $("walker");
+    w.setAttribute("fill", r.color);
+    w.setAttribute("visibility", "visible");
+
+    const extra = mis ? 2 * rr * DATA.branch_d_px : 0;
+    const finalMsg = `${r.building}동 방문접수 도착 (${r.destination}). 정상 ${r.length_px.toFixed(1)}px`
+      + (mis ? ` + 오진입 왕복 약 ${extra.toFixed(1)}px (r=${rr.toFixed(2)})` : "");
+
+    const drawUpTo = (dist) => {
+      trail.replaceChildren();
+      let pos = pts[0].xy;
+      for (const s of segs) {
+        if (dist <= s.start) break;
+        const t = Math.min(1, (dist - s.start) / (s.len || 1));
+        const [x1, y1] = s.a.xy, [x2, y2] = s.b.xy;
+        pos = [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
+        trail.appendChild(el("line", { x1, y1, x2: pos[0], y2: pos[1],
+          stroke: s.b.wrong ? "#cf222e" : r.color, "stroke-width": 5, "stroke-linecap": "round",
+          "stroke-dasharray": s.b.wrong ? "6 5" : "none" }));
+      }
+      w.setAttribute("cx", pos[0]);
+      w.setAttribute("cy", pos[1]);
+    };
+
+    if (reduceMotion) {
+      drawUpTo(total);
+      $("status").textContent = finalMsg;
+      return;
+    }
+    const speed = 120; // px/s (화면상 속도일 뿐, 실제 보행속도 아님)
+    const t0 = performance.now();
+    let lastLabel = "";
+    const step = (now) => {
+      const dist = Math.min(total, ((now - t0) / 1000) * speed);
+      drawUpTo(dist);
+      const cur = segs.find((s) => dist >= s.start && dist < s.start + s.len);
+      const label = cur ? (cur.b.wrong ? (cur.b.label === "오진입 발견" ? "갈림길 J 에서 잘못 들어감" : "되돌아가는 중") : `${cur.b.label} 방향으로 이동`) : "";
+      if (label && label !== lastLabel) { $("status").textContent = label; lastLabel = label; }
+      if (dist < total) raf = requestAnimationFrame(step);
+      else $("status").textContent = finalMsg;
+    };
+    raf = requestAnimationFrame(step);
+  }
+
+  sel.addEventListener("change", syncControls);
+  document.querySelectorAll('input[name="mode"]').forEach((i) => i.addEventListener("change", syncControls));
+  $("r").addEventListener("input", (e) => { $("r-out").textContent = parseFloat(e.target.value).toFixed(2); });
+  $("play").addEventListener("click", play);
+  $("large").addEventListener("click", (e) => {
+    const on = document.body.classList.toggle("large");
+    e.currentTarget.setAttribute("aria-pressed", String(on));
+  });
+  syncControls();
+})();
+</script>
+</body>
+</html>

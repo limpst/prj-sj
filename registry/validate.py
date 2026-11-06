@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     issues = validate(reg)
     if not issues:
-        print("✅ 검증 통과 — 이슈 없음")
+        print("[OK] 검증 통과 — 이슈 없음")
     else:
         errors = [i for i in issues if i.level == "error"]
         warnings = [i for i in issues if i.level == "warning"]

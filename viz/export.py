@@ -76,21 +76,42 @@ def build_payload(g: Graph, synthetic: bool) -> dict:
     }
 
 
-def export(out: str | Path = "viz/routes.json", use_real: bool = False) -> Path:
+TEMPLATE = Path(__file__).with_name("template.html")
+PLACEHOLDER = "/*__DATA__*/null"
+
+
+def render_html(payload: dict, template: Path = TEMPLATE) -> str:
+    """템플릿에 JSON 을 인라인으로 넣는다 (file:// 에서 fetch 불가 → 서버 없이 열기 위함)."""
+    html = template.read_text(encoding="utf-8")
+    if PLACEHOLDER not in html:
+        raise ValueError(f"템플릿에 자리표시자 '{PLACEHOLDER}' 없음")
+    # </script> 조기 종료 방지
+    data = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
+    return html.replace(PLACEHOLDER, data)
+
+
+def export(
+    out: str | Path = "viz/routes.json",
+    use_real: bool = False,
+    html_out: str | Path | None = "viz/index.html",
+) -> Path:
     if use_real and data_available():
         g, synthetic = load_graph(), False
     else:
         g, synthetic = synthetic_graph(), True
+    payload = build_payload(g, synthetic)
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        json.dumps(build_payload(g, synthetic), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    if html_out is not None:
+        Path(html_out).write_text(render_html(payload), encoding="utf-8")
     return out
 
 
 if __name__ == "__main__":
     real = "--real" in sys.argv
     p = export(use_real=real)
-    print(f"저장: {p} ({'실제' if real and data_available() else '합성'} 좌표)")
+    kind = "실제" if real and data_available() else "합성"
+    print(f"저장: {p}, viz/index.html ({kind} 좌표)")
+    if kind == "실제":
+        print("주의: 실제 좌표로 만든 파일은 공개 저장소에 커밋하지 마세요.")
