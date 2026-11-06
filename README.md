@@ -556,35 +556,107 @@ flowchart LR
 ## 14. 저장소 구조와 실행 방법
 
 ```
-prj-sj/
-├─ README.md                    # 이 문서 (설계 문서 / 기술 보고서)
+sejong-prj/
+├─ README.md                          # 이 문서 (설계 문서 / 기술 보고서)
 ├─ .kiro/
-│  ├─ steering/                 # Kiro 상시 규칙 (product · tech · structure)
+│  ├─ steering/                       # Kiro 상시 규칙 (product · tech · structure)
+│  ├─ hooks/                          # Kiro 자동화 훅 (파일 저장 시 GitHub 동기화 등)
 │  └─ specs/sejong-wayfinding-pilot/
-│     ├─ requirements.md        # EARS 요구사항
-│     ├─ design.md              # 설계
-│     └─ tasks.md               # 구현 작업 목록
+│     ├─ requirements.md              # EARS 요구사항
+│     ├─ design.md                    # 설계
+│     └─ tasks.md                     # 구현 작업 목록
 ├─ sim/
-│  └─ wayfinding.py             # Dijkstra + E[L] 오진입 기대값 모형
+│  ├─ wayfinding.py                   # Dijkstra + E[L] 오진입 기대값 모형 ✅
+│  └─ io.py                           # CSV → Graph 로더 (data/ 있을 때만 활성) 🔜
+├─ registry/
+│  ├─ model.py                        # Marker · Route · Revision dataclass 🔜
+│  └─ validate.py                     # 승인대장 검증기 🔜
+├─ observe/
+│  ├─ model.py                        # Observation (개인정보 없음) 🔜
+│  └─ estimate.py                     # p · r 추정 + 조건별 집계 리포트 🔜
+├─ viz/
+│  ├─ routes.json                     # 경로 내보내기 (합성 좌표) 🔜
+│  └─ index.html                      # 정상·오진입·복귀 애니메이션 (서버 불필요) 🔜
+├─ data/                              # 비공개 (gitignore) — 실제 계획선 좌표
+│  ├─ points.csv                      # id, x, y, kind
+│  └─ edges.csv                       # a, b
 ├─ tests/
-│  └─ test_wayfinding.py        # 원자료 표(슬라이드 8) 재현 테스트
-└─ docs/source/                 # 원자료 PPTX (로컬 전용, gitignore)
+│  └─ test_wayfinding.py              # 원자료 표(슬라이드 8) 재현 테스트 ✅
+└─ docs/source/                       # 원자료 PPTX (로컬 전용, gitignore)
 ```
+
+> ✅ 구현 완료 &nbsp;|&nbsp; 🔜 구현 예정 (tasks.md 2–6번)
+
+---
+
+### 빠른 시작
+
+#### 1. 의존성 설치
 
 ```bash
-python -m pip install pytest
-python -m pytest -q            # 5 passed
-python -m sim.wayfinding       # 기대값 표 출력
+pip install pytest
 ```
 
-출력 예:
+표준 라이브러리만 사용하므로 다른 패키지는 필요 없습니다.
+
+#### 2. 테스트 실행 (원자료 수치 재현 확인)
+
+```bash
+python -m pytest -q
+```
 
 ```
-B->R5 extra px (rows p, cols r=0.25/0.50/1.00)
-p=10% [1.5, 3.0, 6.0]
-p=20% [3.0, 6.0, 12.0]
-p=30% [4.5, 9.0, 18.0]
+5 passed in 0.XXs
 ```
+
+#### 3. 기대값 표 출력 (E\[L\] = L0 + 2·p·r·d)
+
+```bash
+python -m sim.wayfinding
+```
+
+```
+⚠  p·r은 가정값이며 넛지 효과 예측이 아닙니다.
+B->R5 extra px (rows=p, cols=r 0.25/0.50/1.00)
+p=10%  [ 1.5,  3.0,  6.0]
+p=20%  [ 3.0,  6.0, 12.0]
+p=30%  [ 4.5,  9.0, 18.0]
+```
+
+> 단위: 도상 px (평면도 위 길이). 실제 거리(m)·시간(s)이 아닙니다.
+
+#### 4. 시각화 열기 (구현 후)
+
+```bash
+# viz/index.html 을 브라우저에서 직접 열기 — 서버 불필요
+start viz/index.html          # Windows
+open viz/index.html           # macOS
+```
+
+#### 5. 승인대장 검증 (구현 후)
+
+```bash
+python -m registry.validate registry/registry.json
+```
+
+#### 6. 관측 데이터 p·r 추정 리포트 (구현 후)
+
+```bash
+python -m observe.estimate observe/data.json
+```
+
+---
+
+### 명령 한눈에 보기
+
+| 목적 | 명령 |
+|---|---|
+| 테스트 전체 실행 | `python -m pytest -q` |
+| 기대값 표 출력 | `python -m sim.wayfinding` |
+| CSV → Graph 로드 확인 | `python -m sim.io` |
+| 승인대장 검증 | `python -m registry.validate` |
+| 관측 p·r 리포트 | `python -m observe.estimate` |
+| 시각화 브라우저로 열기 | `start viz/index.html` |
 
 ---
 
