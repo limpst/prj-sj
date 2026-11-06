@@ -79,8 +79,48 @@ def extra_length_table(
     return {(p, r): round(2 * p * r * d, 1) for p, r in product(ps, rs)}
 
 
+ASSUMPTION_NOTICE = (
+    "⚠  p·r 은 가정값이며 넛지 효과 예측이 아닙니다. "
+    "단위는 도상 px (평면도 위 길이)이며 실제 거리(m)·시간(s)이 아닙니다."
+)
+
+
+def table_as_dict(
+    ps: Iterable[float] = (0.10, 0.20, 0.30),
+    rs: Iterable[float] = (0.25, 0.50, 1.00),
+    d: float = B_J_MISENTRY_BRANCH_PX,
+) -> dict:
+    """CLI·JSON 출력용: 가정값 고지 포함 dict 반환."""
+    return {
+        "notice": ASSUMPTION_NOTICE,
+        "unit": "도상 px",
+        "branch_d_px": d,
+        "table": {
+            f"p={p:.0%}": {
+                f"r={r:.2f}": round(2 * p * r * d, 1)
+                for r in rs
+            }
+            for p in ps
+        },
+    }
+
+
 if __name__ == "__main__":
-    print("B->R5 extra px (rows p, cols r=0.25/0.50/1.00)")
-    t = extra_length_table()
-    for p in (0.10, 0.20, 0.30):
-        print(f"p={p:.0%}", [t[(p, r)] for r in (0.25, 0.50, 1.00)])
+    import json
+    import sys
+
+    fmt = sys.argv[1] if len(sys.argv) > 1 else "text"
+
+    if fmt == "json":
+        print(json.dumps(table_as_dict(), ensure_ascii=False, indent=2))
+    else:
+        print(ASSUMPTION_NOTICE)
+        print()
+        print("B->R5 평균 추가 도상길이 (rows=p, cols=r=0.25/0.50/1.00)  단위: px")
+        t = extra_length_table()
+        header = f"{'':8} {'r=0.25':>8} {'r=0.50':>8} {'r=1.00':>8}"
+        print(header)
+        print("-" * len(header))
+        for p in (0.10, 0.20, 0.30):
+            vals = [t[(p, r)] for r in (0.25, 0.50, 1.00)]
+            print(f"p={p:.0%}    {vals[0]:>8.1f} {vals[1]:>8.1f} {vals[2]:>8.1f}")

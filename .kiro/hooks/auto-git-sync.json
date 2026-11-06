@@ -4,12 +4,12 @@
     {
       "name": "Auto GitHub Sync",
       "trigger": "PostFileSave",
-      "description": "코드/문서 파일 저장 시 자동으로 git add → commit → push",
+      "description": "코드/문서 파일 저장 시 GitHub 변경을 먼저 받은 뒤 add → commit → push",
       "matcher": "\\\\.(py|md|json|html|css|js|csv|txt)$",
       "action": {
         "type": "command",
-        "command": "cd 'c:\\Users\\lee\\Downloads\\sejong-prj'; git add -A; $msg = 'auto: sync ' + (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'); git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m $msg; git push origin main }",
-        "timeout": 30
+        "command": "cd 'c:\\Users\\lee\\Downloads\\sejong-prj'; $cred = 'credential.helper=!gh auth git-credential'; git -c $cred fetch origin -q; git add -A; git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -q -m ('auto: sync ' + (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')) }; git -c $cred pull --rebase -q origin main; if ($LASTEXITCODE -eq 0) { git -c credential.helper= -c $cred push -q origin main } else { git rebase --abort; Write-Output 'sync: rebase conflict, push skipped' }",
+        "timeout": 60
       }
     }
   ]
